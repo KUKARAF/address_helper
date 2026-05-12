@@ -2,130 +2,173 @@
 
 ## Overview
 
+Two independent flows:
+
+1. **Flow 1 (CI/CD)**: Downloads full PBF → minifies → uploads → updates `links.toml`
+2. **Flow 2 (Library)**: Reads `pbf_url` from `links.toml` → downloads minified PBF → queries with pyosmium
+
+Flow 2 is not aware of Flow 1. It only uses the `pbf_url` field in `links.toml`.
+
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                        address-standardizer repo                     │
+│                    Flow 1: CI/CD Pipeline                            │
 │                                                                      │
-│  links.toml          ← updated by CI/CD in ../static repo           │
-│  address_standardizer/                                               │
-│    models/region.py  ← reads links.toml at import time              │
-│    osm/downloader.py ← uses preferred_file URL from region          │
+│  links.toml                                                          │
+│    │  read source_url                                               │
+│    ▼                                                                 │
+│  download.geofabrik.de/europe/germany-latest.osm.pbf (~4GB)         │
+│    │                                                                 │
+│    ▼                                                                 │
+│  osmium tags-filter (see osm-filter-spec.md)                        │
+│    │                                                                 │
+│    ▼                                                                 │
+│  staticfiles/DE-addresses.osm.pbf (~200-400MB)                      │
+│    │                                                                 │
+│    ▼                                                                 │
+│  Upload to static.osmosis.page/osm/                                 │
+│    │                                                                 │
+│    ▼                                                                 │
+│  Update links.toml pbf_url field                                    │
 └─────────────────────────────────────────────────────────────────────┘
-         │                                        ▲
-         │ pip install                            │ git commit links.toml
-         ▼                                        │
-┌─────────────────┐              ┌────────────────────────────────────┐
-│  User App       │              │  ../static repo  (CI/CD pipeline)  │
-│                 │              │                                     │
-│  Address("...")  │              │  .tools/create_..._pbf.sh          │
-└─────────────────┘              │    1. Download from Geofabrik       │
-                                 │    2. osmium tags-filter            │
-                                 │    3. Upload to static.osmosis.page │
-                                 │    4. Update links.toml             │
-                                 │    5. Commit + push                 │
-                                 └────────────────────────────────────┘
-                                              │ upload
-                                              ▼
-                                 ┌────────────────────────────────────┐
-                                 │  static.osmosis.page               │
-                                 │  (S3 or static file server)        │
-                                 │                                     │
-                                 │  DE-addresses-latest.osm.pbf       │
-                                 │  DE-addresses-latest.osm.pbf.md5   │
-                                 └────────────────────────────────────┘
-                                              │ download (first run)
-                                              ▼
-                                 ┌────────────────────────────────────┐
-                                 │  ~/.address-standardizer/          │
-                                 │    DE-addresses-latest.osm.pbf     │
-                                 │    cache.sqlite                    │
-                                 └────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────┐
+│                    Flow 2: Library                                   │
+│                                                                      │
+│  Address("Friesenstrasse 19, Berlin")                               │
+│    │                                                                 │
+│    ▼                                                                 │
+│  Check if minified PBF exists locally                               │
+│    │                                                                 │
+│    ▼ (if missing)                                                   │
+│  Read pbf_url from links.toml                                       │
+│    │                                                                 │
+│    ▼                                                                 │
+│  Download from static.osmosis.page/osm/DE-addresses.osm.pbf         │
+│    │                                                                 │
+│    ▼                                                                 │
+│  Query PBF with pyosmium                                            │
+│    │                                                                 │
+│    ▼                                                                 │
+│  Return Address object                                              │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
-## Data Pipeline
+## Flow 1: CI/CD - PBF Minification
 
-### Step 1: Minification (CI/CD in `../static` repo)
-Runs on a schedule (e.g. weekly) or manually triggered.
+Triggered when:
+- `osm-filter-spec.md` changes (filter rules updated)
+- Manually triggered (e.g., to pick up new Geofabrik data)
 
-```
-Geofabrik PBF (~4GB)
-    │
-    ▼
-osmium tags-filter
-    │  keeps: addr:*, name, place=*, boundary=administrative, buildings
-    ▼
-Minified PBF (~200-400MB)
-    │
-    ▼
-Upload to static.osmosis.page
-    │
-    ▼
-Update links.toml → commit → push to address-standardizer repo
+### Usage
+
+```bash
+# Create minified PBF for Germany
+.tools/create_minified_pbf.sh DE staticfiles/DE-addresses.osm.pbf
+
+# Create minified PBF for Austria
+.tools/create_minified_pbf.sh AT staticfiles/AT-addresses.osm.pbf
 ```
 
-### Step 2: User Download (library, first run per country)
+### What the script does
+
 ```
 links.toml
-    │  preferred_file = minified if available, else full Geofabrik
+    │  read source_url for country
     ▼
-Download PBF to ~/.address-standardizer/
-    │  verify MD5 checksum
+Download from Geofabrik
+    │  germany-latest.osm.pbf (~4GB)
     ▼
-Parse with pyosmium → extract address rows
+osmium tags-filter
+    │  keeps only: addr:*, place=*, boundary=administrative, name
+    │  (see osm-filter-spec.md for full list)
+    ▼
+staticfiles/
+    │  DE-addresses.osm.pbf (~200-400MB)
+    │  DE-addresses.osm.pbf.md5
+    ▼
+Upload to static.osmosis.page/osm/  (manual for now)
     │
     ▼
-Store in ~/.address-standardizer/cache.sqlite
-    │  indexes on: street, postcode, city
-    ▼
-PBF file can be deleted (optional, configurable)
+Update links.toml
+    │  set pbf_url = "https://static.osmosis.page/osm/DE-addresses.osm.pbf"
+    │  set checksum_url = "https://static.osmosis.page/osm/DE-addresses.osm.pbf.md5"
 ```
 
-### Step 3: Address Lookup (library, every call)
+## Flow 2: Library - Address Standardization
+
+Triggered on every `Address(raw_string)` call. **Not aware of Flow 1.**
+
 ```
-Address("Friesenstrasse 19, Berlin")
+Address("Friesenstrasse 19, Berlin", data_dir="~/.address-standardizer/")
     │
     ▼
-Query cache.sqlite
-    │  SELECT * FROM addresses WHERE street LIKE ? AND city LIKE ?
+Check: does DE-addresses.osm.pbf exist at data_dir?
+    │
+    ├─ NO ──▶ Read pbf_url from links.toml
+    │              │
+    │              ▼
+    │         Download from static.osmosis.page
+    │              │
+    │              ▼
+    │         Save to data_dir
+    │
     ▼
-Return structured AddressComponents
+Query minified PBF with pyosmium
+    │  search for matching street, housenumber, city
+    ▼
+Return Address object:
+    Address(
+        street="Friesenstraße",
+        housenumber="19",
+        postcode="10965",
+        city="Berlin",
+        country="DE",
+        raw="Friesenstrasse 19, Berlin"
+    )
 ```
 
 ## File Roles
 
-| File | Repo | Purpose |
+| File | Flow | Purpose |
 |------|------|---------|
-| `links.toml` | address-standardizer | Maps country codes → download URLs. Source of truth for what's available. |
-| `address_standardizer/models/region.py` | address-standardizer | Reads `links.toml`, exposes `get_country_region()` |
-| `address_standardizer/osm/downloader.py` | address-standardizer | Downloads PBF using URL from `region.preferred_file` |
-| `.tools/create_street_postcode_city_only_pbf.sh` | address-standardizer | CI/CD entry point: download → filter → upload → update toml |
-| `.tools/create_street_postcode_city_only_pbf.py` | address-standardizer | Updates `links.toml` fields after upload |
+| `links.toml` | Both | Source URLs (Flow 1) and minified URLs (Flow 2) |
+| `osm-filter-spec.md` | Flow 1 | Defines which OSM tags to keep/remove |
+| `.tools/create_minified_pbf.sh` | Flow 1 | Script to download, minify, and output PBF |
+| `staticfiles/` | Flow 1 | Local output directory for minified PBF before upload |
+| `address_standardizer/address.py` | Flow 2 | Address class - main entry point |
+| `address_standardizer/osm/downloader.py` | Flow 2 | Downloads minified PBF using pbf_url |
+| `address_standardizer/osm/query.py` | Flow 2 | Queries PBF with pyosmium |
 
 ## links.toml Schema
 
 ```toml
 [meta]
 schema_version = "1"
-static_base_url = "https://static.osmosis.page/osm"
 last_updated = "2024-01-15T12:00:00Z"
 
 [countries.DE]
 name = "Germany"
-full = "https://download.geofabrik.de/europe/germany-latest.osm.pbf"
-full_checksum = "https://download.geofabrik.de/europe/germany-latest.osm.pbf.md5"
-minified = "https://static.osmosis.page/osm/DE-addresses-latest.osm.pbf"
-minified_checksum = "https://static.osmosis.page/osm/DE-addresses-latest.osm.pbf.md5"
-minified_size_mb = 210.4
-last_minified = "2024-01-15T12:00:00Z"
+# Used by Flow 1 (CI/CD) to download full PBF
+source_url = "https://download.geofabrik.de/europe/germany-latest.osm.pbf"
+source_checksum = "https://download.geofabrik.de/europe/germany-latest.osm.pbf.md5"
+# Used by Flow 2 (Library) - updated by Flow 1 after minification
+pbf_url = "https://static.osmosis.page/osm/DE-addresses.osm.pbf"
+checksum_url = "https://static.osmosis.page/osm/DE-addresses.osm.pbf.md5"
 ```
 
-## CI/CD Trigger Strategy
+## Local Data Directory
 
-The minification pipeline should run:
-- **Weekly** (cron) to pick up OSM data updates from Geofabrik
-- **Manually** when a new country is added to `links.toml`
-- **On push** to `../static` repo if osmium filter expressions change
+Default: `~/.address-standardizer/`
 
-After a successful run, the pipeline commits the updated `links.toml` back
-to the `address-standardizer` repo. Library users get the new URL on their
-next cache refresh (controlled by `cache_ttl_days` in settings).
+Can be overridden on class init:
+```python
+addr = Address("Friesenstrasse 19", data_dir="/custom/path/")
+```
+
+Contents:
+```
+~/.address-standardizer/
+    DE-addresses.osm.pbf    # Downloaded minified PBF
+    FR-addresses.osm.pbf    # (future)
+    ...
+```
