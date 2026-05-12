@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  osm-minifier:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: address-helper:osm-minifier
+    container_name: address-helper-osm-minifier
+    volumes:
+      # Mount the project root to access links.toml
+      - ..:/workspace:rw
+    working_dir: /workspace
+    environment:
+      - TZ=UTC
+    # Keep container running
+    stdin_open: true
+    tty: true
+    command: /bin/bash
