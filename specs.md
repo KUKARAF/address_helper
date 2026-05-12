@@ -1,7 +1,7 @@
 # address-standardizer
 
 ## Overview
-Address-standardizer is a Python library that parses and standardizes address strings using OpenStreetMap (OSM) data. It provides an address class that can be initialized with a raw address string, identifies the correct location using OSM's search logic, and returns a standardized address with structured components (street, city, country, etc.). The library downloads OSM data to a local cache for offline reuse, with support for downloading specific regions on demand.
+Address-standardizer is a Python library that parses and standardizes address strings using OpenStreetMap (OSM) data. It provides an Address class that can be initialized with a raw address string, identifies the correct location using OSM's search logic, and returns a standardized address with structured components (street, city, country, etc.). The library downloads minified OSM PBF files from static.osmosis.page for offline reuse.
 
 ## Goals & Non-Goals
 
@@ -24,51 +24,35 @@ Address-standardizer is a Python library that parses and standardizes address st
 
 ## Architecture
 
+See `architecture.md` for detailed diagrams.
+
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    User Application                          │
-│                                                             │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │           address_standardizer Library              │   │
-│  │                                                     │   │
-│  │  ┌─────────────┐  ┌──────────────┐  ┌────────────┐ │   │
-│  │  │   Address   │  │   OSMData    │  │   Cache    │ │   │
-│  │  │   Class     │──│   Manager    │──│   Layer    │ │   │
-│  │  │             │  │              │  │            │ │   │
-│  │  └─────────────┘  └──────────────┘  └────────────┘ │   │
-│  │          │                   │              │      │   │
-│  │  ┌──────────────┐    ┌──────────────┐      │      │   │
-│  │  │  Validator   │    │  Normalizer  │      │      │   │
-│  │  │   Logic      │    │   Logic      │      │      │   │
-│  │  └──────────────┘    └──────────────┘      │      │   │
-│  └─────────────────────────────────────────────│──────┘   │
-│                                                │          │
-└────────────────────────────────────────────────│──────────┘
-                                                 │
-                                    ┌────────────▼────────────┐
-                                    │    Local Cache Dir      │
-                                    │    (~/.address-std/)    │
-                                    │  ┌──────────────────┐   │
-                                    │  │  country1.pbf    │   │
-                                    │  │  country2.pbf    │   │
-                                    │  │  cache.sqlite    │   │
-                                    │  └──────────────────┘   │
-                                    └─────────────────────────┘
-                                                 │
-                                    ┌────────────▼────────────┐
-                                    │   OSM Servers/APIs      │
-                                    │  (download.geofabrik.de)│
-                                    │  (overpass-api.de)      │
-                                    └─────────────────────────┘
+User Application
+    |
+    v
+address_standardizer Library
+    |-- Address class (main entry point)
+    |-- PBF Query (pyosmium)
+    |-- Validator / Normalizer
+    |
+    v
+Local Data Dir (~/.address-standardizer/)
+    |-- DE-addresses.osm.pbf
+    |-- FR-addresses.osm.pbf (future)
+    |
+    v (if PBF missing)
+static.osmosis.page/osm/
+    |-- DE-addresses.osm.pbf
 ```
 
 ### Data Flow
-1. User instantiates `Address(raw_string="Friesenstrasse 19")`
-2. Library checks if required region data exists in local cache
-3. If missing, downloads specific region data from OpenStreetMap servers
-4. Parses address using OSM's search logic against cached data
-5. Returns structured, standardized address components
-6. Subsequent calls reuse cached data for same region
+1. User instantiates `Address(raw_string="Friesenstrasse 19, Berlin")`
+2. Library checks if minified PBF exists locally (e.g., `~/.address-standardizer/DE-addresses.osm.pbf`)
+3. If missing, downloads from static.osmosis.page
+4. Queries PBF directly with pyosmium to find matching address
+5. Returns structured Address object with street, housenumber, postcode, city, country
+
+See `architecture.md` for detailed flow diagrams.
 
 ## Stack
 
@@ -84,12 +68,10 @@ Address-standardizer is a Python library that parses and standardizes address st
   - `python-dateutil` - For handling timestamps in OSM data
 
 ### Data
-- **Database**: SQLite for local cache - lightweight, no external dependencies
-- **ORM**: SQLAlchemy 2.x (async optional) - for structured cache queries
-- **Cache strategy**: Local filesystem with SQLite metadata
-  - OSM PBF files stored as downloaded
-  - Processed address data indexed in SQLite for fast lookups
-  - Configurable cache location with default at `~/.address-standardizer/`
+- **Storage**: Minified PBF files stored locally
+- **Data source**: static.osmosis.page (minified PBF files)
+- **Query**: Direct PBF queries using pyosmium
+- **Cache location**: Configurable, default `~/.address-standardizer/`
 
 ### Dev tooling
 - **Package manager**: `uv` - fast, modern, supports locking and virtualenvs
@@ -282,34 +264,21 @@ class AddressComponents(BaseModel):
     bounding_box: Optional[Tuple[float, float, float, float]]
 ```
 
-### Cache Schema (SQLAlchemy)
-```python
-class OSMCache(Base):
-    __tablename__ = "osm_cache"
-    
-    id = Column(Integer, primary_key=True)
-    region = Column(String(2), index=True)  # ISO country code
-    downloaded_at = Column(DateTime)
-    file_path = Column(String)
-    file_size = Column(Integer)
-    data_version = Column(String)  # OSM data version/timestamp
-    is_active = Column(Boolean, default=True)
-```
-
 ## Key Design Decisions
 
-### Decision: Local SQLite cache over in-memory only
-- **Rationale**: Need to persist large OSM datasets (~GBs) between runs. SQLite provides structured querying and metadata management without external dependencies.
+### Decision: Direct PBF queries over intermediate database
+- **Rationale**: Minified PBF files are small enough (~200-400MB) to query directly with pyosmium. Avoids complexity of maintaining a separate database.
 - **Alternatives considered**:
-  - Pure filesystem cache: Harder to query and manage metadata
-  - Redis: External dependency, overkill for local library
-  - In-memory only: Would require re-downloading on every run
+  - SQLite cache: Added complexity, extra processing step
+  - In-memory index: High memory usage for large datasets
+  - Parquet: Good for analytics but PBF is native OSM format
 
-### Decision: Region-based downloads over global dataset
-- **Rationale**: OSM global dataset is ~100GB+ compressed. Most users need specific countries. Region-based allows incremental downloads and smaller footprint.
+### Decision: Pre-minified PBF over full downloads
+- **Rationale**: Full OSM country files are huge (~4GB for Germany). Pre-minified files contain only address-relevant tags, reducing size by ~90-95%.
 - **Alternatives considered**:
-  - Download global extract: Impractical for most users, long download times
+  - Download full Geofabrik files: Too large, slow downloads, wasteful
   - Use Overpass API for queries: Requires internet, slower, rate-limited
+  - Client-side minification: Requires osmium on user machine, slow first run
   - Pre-packaged regional datasets: Hard to maintain, large package size
 
 ### Decision: PBF format over XML for OSM data
@@ -409,18 +378,18 @@ make clean
 ## Performance & Scaling Considerations
 
 ### Known Bottlenecks
-1. **Initial OSM download**: Large files (100MB-1GB per country)
-   - Mitigation: Progress reporting, resume support, regional extracts
-2. **PBF parsing**: CPU-intensive for large extracts
-   - Mitigation: Index important fields in SQLite, lazy loading
-3. **Memory usage**: Large OSM files in memory
-   - Mitigation: Stream processing, chunked reads
+1. **Initial PBF download**: Minified files are ~200-400MB per country
+   - Mitigation: Progress reporting, resume support
+2. **PBF parsing**: CPU-intensive when scanning for matches
+   - Mitigation: pyosmium streaming, early termination on match
+3. **Memory usage**: Large PBF files during parsing
+   - Mitigation: Stream processing with pyosmium handlers
 
 ### Optimization Strategy
-  - Build spatial indexes for common queries
+  - Use pyosmium's efficient C++ backend for parsing
   - Cache frequent address lookups in memory LRU
-  - Compress OSM data in cache (lz4/zstd)
-  - Parallel parsing for multi-core systems
+  - Early termination once match is found
+  - Parallel parsing for multi-core systems (future)
 
 ### Load Targets
 - Single address lookup: < 100ms (after cache warm-up)
