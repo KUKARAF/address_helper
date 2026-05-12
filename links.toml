@@ -1,0 +1,79 @@
+# links.toml
+# Maps ISO 3166-1 alpha-2 country codes to OSM data download URLs.
+#
+# Each entry has:
+#   full     = Original Geofabrik PBF (~full size, always available)
+#   minified = Address-only filtered PBF hosted on static.osmosis.page
+#              (produced by CI/CD pipeline in the static repo)
+#              Empty string means the minified version has not been generated yet.
+#
+# The library will prefer the minified URL when available.
+# Minified files contain only address-relevant OSM tags:
+#   addr:street, addr:housenumber, addr:city, addr:postcode,
+#   addr:country, name, boundary=administrative, place=*
+#
+# This file is updated automatically by the CI/CD pipeline in ../static
+# when a new minified file is uploaded to static.osmosis.page.
+#
+# DO NOT manually edit the [countries.*.minified] fields —
+# they are managed by CI/CD.
+
+[meta]
+schema_version = "1"
+static_base_url = "https://static.osmosis.page/osm"
+last_updated = ""  # ISO 8601, set by CI/CD pipeline
+
+[countries.DE]
+name = "Germany"
+full = "https://download.geofabrik.de/europe/germany-latest.osm.pbf"
+full_checksum = "https://download.geofabrik.de/europe/germany-latest.osm.pbf.md5"
+minified = ""  # set by CI/CD, e.g. "https://static.osmosis.page/osm/DE-addresses-latest.osm.pbf"
+minified_checksum = ""  # set by CI/CD
+minified_size_mb = 0  # set by CI/CD
+last_minified = ""  # ISO 8601, set by CI/CD
+
+# TODO: Add more countries. Suggested next additions:
+# [countries.AT]
+# name = "Austria"
+# full = "https://download.geofabrik.de/europe/austria-latest.osm.pbf"
+# full_checksum = "https://download.geofabrik.de/europe/austria-latest.osm.pbf.md5"
+# minified = ""
+# minified_checksum = ""
+# minified_size_mb = 0
+# last_minified = ""
+#
+# [countries.CH]
+# name = "Switzerland"
+# full = "https://download.geofabrik.de/europe/switzerland-latest.osm.pbf"
+# full_checksum = "https://download.geofabrik.de/europe/switzerland-latest.osm.pbf.md5"
+# minified = ""
+# minified_checksum = ""
+# minified_size_mb = 0
+# last_minified = ""
+#
+# [countries.NL]
+# name = "Netherlands"
+# full = "https://download.geofabrik.de/europe/netherlands-latest.osm.pbf"
+# full_checksum = "https://download.geofabrik.de/europe/netherlands-latest.osm.pbf.md5"
+# minified = ""
+# minified_checksum = ""
+# minified_size_mb = 0
+# last_minified = ""
+#
+# [countries.FR]
+# name = "France"
+# full = "https://download.geofabrik.de/europe/france-latest.osm.pbf"
+# full_checksum = "https://download.geofabrik.de/europe/france-latest.osm.pbf.md5"
+# minified = ""
+# minified_checksum = ""
+# minified_size_mb = 0
+# last_minified = ""
+#
+# [countries.GB]
+# name = "Great Britain"
+# full = "https://download.geofabrik.de/europe/great-britain-latest.osm.pbf"
+# full_checksum = "https://download.geofabrik.de/europe/great-britain-latest.osm.pbf.md5"
+# minified = ""
+# minified_checksum = ""
+# minified_size_mb = 0
+# last_minified = ""
