@@ -1,0 +1,96 @@
+name: Build Address DB
+
+on:
+  push:
+    paths:
+      - 'address_standardizer/db.py'
+      - 'address_standardizer/query.py'
+      - 'address_standardizer/downloader.py'
+      - 'address_standardizer/postcode_filter.py'
+      - 'address_standardizer/models/region.py'
+      - 'pyproject.toml'
+      - '.github/workflows/build-address-db.yml'
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  build-db:
+    runs-on: ubuntu-latest
+    timeout-minutes: 600
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: latest
+
+      - name: Install dependencies
+        run: uv pip install -e .
+
+      - name: Download OSM PBF and build DB
+        run: |
+          python -c "
+          from address_standardizer.db import AddressDB
+          from address_standardizer.downloader import get_pbf_path
+          from pathlib import Path
+
+          print('Downloading PBF file...')
+          pbf_path = get_pbf_path('DE', force=True)
+
+          print(f'Building DB from {pbf_path}...')
+          db = AddressDB(pbf_path)
+          db.close()
+
+          db_path = Path('DE-addresses.osm.db')
+          if db_path.exists():
+              size_gb = db_path.stat().st_size / (1024**3)
+              print(f'✓ DB built successfully: {size_gb:.1f}GB')
+          else:
+              raise FileNotFoundError('DB file not created')
+          "
+
+      - name: Calculate checksum
+        run: |
+          md5sum DE-addresses.osm.db | awk '{print $1}' > DE-addresses.osm.db.md5
+          cat DE-addresses.osm.db.md5
+
+      - name: Get DB size
+        id: db-info
+        run: |
+          SIZE=$(du -h DE-addresses.osm.db | cut -f1)
+          MD5=$(cat DE-addresses.osm.db.md5)
+          echo "size=$SIZE" >> $GITHUB_OUTPUT
+          echo "md5=$MD5" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            DE-addresses.osm.db
+            DE-addresses.osm.db.md5
+          tag_name: db-${{ github.run_number }}
+          name: Address DB Build ${{ github.run_number }}
+          body: |
+            Built from commit: ${{ github.sha }}
+
+            **Database Info:**
+            - Size: ${{ steps.db-info.outputs.size }}
+            - MD5: `${{ steps.db-info.outputs.md5 }}`
+            - Timestamp: ${{ github.event.head_commit.timestamp }}
+
+            Download the `DE-addresses.osm.db` file to use locally or update your static server.
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
