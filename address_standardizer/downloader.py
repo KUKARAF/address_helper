@@ -1,7 +1,8 @@
-"""Download and cache OSM PBF files."""
+"""Download and cache OSM PBF files and databases."""
 
 import os
 from pathlib import Path
+from typing import Optional
 
 import requests
 
@@ -79,3 +80,39 @@ def get_pbf_path(iso_code: str, force: bool = False) -> Path:
         return cache_file
 
     return download_pbf(iso_code, force=force)
+
+
+def get_db_url(iso_code: str, override_url: Optional[str] = None) -> str:
+    """
+    Get the database URL for a country.
+
+    Precedence (highest to lowest):
+    1. override_url parameter (if provided)
+    2. DB_URL environment variable
+    3. db_url from links.toml (default from static.osmosis.page)
+
+    Args:
+        iso_code: ISO 3166-1 alpha-2 country code
+        override_url: Optional explicit URL to use
+
+    Returns:
+        URL to download the database from
+
+    Raises:
+        ValueError: If no URL is available and none is provided
+    """
+    if override_url:
+        return override_url
+
+    env_url = os.environ.get("DB_URL")
+    if env_url:
+        return env_url
+
+    region = get_country_region(iso_code)
+    if hasattr(region, "db_url") and region.db_url:
+        return region.db_url
+
+    raise ValueError(
+        f"No database URL available for {iso_code}. "
+        "Set DB_URL environment variable or provide override_url parameter."
+    )

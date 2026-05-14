@@ -27,6 +27,12 @@ dev = [
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[tool.hatchling.targets.wheel]
+packages = ["address_standardizer"]
+
+[tool.hatchling.targets.wheel.force-include]
+"address_standardizer/data" = "address_standardizer/data"
+
 [tool.ruff]
 line-length = 100
 target-version = "py310"
