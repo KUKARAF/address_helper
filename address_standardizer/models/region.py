@@ -105,17 +105,17 @@ def _load_country_region_map(toml_path: Path = _LINKS_TOML_PATH) -> dict[str, Co
 
     for iso_code, entry in countries.items():
         full_file = RegionFile(
-            url=entry["full"],
-            checksum_url=entry.get("full_checksum", ""),
+            url=entry["source_url"],
+            checksum_url=entry.get("source_checksum", ""),
             is_minified=False,
         )
 
-        minified_url = entry.get("minified", "")
+        minified_url = entry.get("pbf_url", "")
         minified_file: RegionFile | None = None
         if minified_url:
             minified_file = RegionFile(
                 url=minified_url,
-                checksum_url=entry.get("minified_checksum", ""),
+                checksum_url=entry.get("checksum_url", ""),
                 is_minified=True,
             )
 
