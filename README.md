@@ -18,7 +18,15 @@ standardizer = AddressStandardizer()
 
 # Parse and standardize an address
 result = standardizer.standardize("123 Main St, New York, NY 10001")
+print(result)
 ```
+
+## Features
+
+- Parses address strings into structured components
+- Standardizes address formatting
+- Validates addresses against OpenStreetMap data
+- Supports multiple address formats
 
 ## Contributing
 
