@@ -106,6 +106,12 @@ For coverage reports:
 pytest --cov=address_standardizer
 ```
 
+## Project Structure
+
+- `address_standardizer/` - Main package
+- `tests/` - Test suite
+- `docs/` - Documentation
+
 ## License
 
 MIT
