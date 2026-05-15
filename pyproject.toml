@@ -43,4 +43,4 @@ python_version = "3.10"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "--cov=address_standardizer --cov-report=term-only"
+addopts = "--cov=address_standardizer --cov-report=term-missing"
