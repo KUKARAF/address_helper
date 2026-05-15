@@ -6,6 +6,7 @@ from typing import Any, Optional
 
 import osmium
 import requests
+from rapidfuzz import fuzz
 
 from .postcode_filter import extract_postcode_from_address
 from .query import AddressMatch
@@ -166,39 +167,97 @@ class AddressDB:
         print("Creating indexes...", flush=True)
         conn.execute("CREATE INDEX idx_postcode ON addresses(postcode)")
         conn.execute("CREATE INDEX idx_street_lower ON addresses(street_lower)")
-        conn.execute(
-            "CREATE INDEX idx_postcode_street ON addresses(postcode, street_lower)"
-        )
+        conn.execute("CREATE INDEX idx_postcode_street ON addresses(postcode, street_lower)")
         conn.commit()
         conn.close()
 
         print(f"Index built at {self.db_path}", flush=True)
 
-    def search(self, query: str, max_results: int = 10) -> list[AddressMatch]:
-        """Search for addresses matching the query."""
+    def search(
+        self,
+        query: str,
+        max_results: int = 10,
+        token_weight: float = 0.6,
+        partial_weight: float = 0.4,
+        min_score: int = 70,
+    ) -> list[tuple[float, AddressMatch]]:
+        """
+        Search for addresses matching the query using weighted fuzzy matching.
+
+        Args:
+            query: Address query string
+            max_results: Maximum number of results to return
+            token_weight: Weight for token_set_ratio (0.0-1.0, default 0.6)
+            partial_weight: Weight for partial_ratio (0.0-1.0, default 0.4)
+            min_score: Minimum score threshold (0-100, default 70)
+
+        Returns:
+            List of (score, AddressMatch) tuples sorted by score descending
+        """
         if self.conn is None:
             raise RuntimeError("Database connection not initialized")
 
         postcode = extract_postcode_from_address(query)
-        query_lower = query.lower()
-        query_tokens = [t.strip() for t in query_lower.split() if t.strip()]
+        # Extract city from query (match text after last comma if it exists)
+        city_from_query = None
+        query_parts = query.rsplit(",", 1)
+        if len(query_parts) == 2:
+            potential_city = query_parts[1].strip().split()[-1]  # Get last word after comma
+            # Remove postcode if it's there
+            if postcode and postcode in potential_city:
+                potential_city = query_parts[0].strip().rsplit(",", 1)[-1].strip()
+            city_from_query = potential_city if potential_city else None
 
-        if not query_tokens:
+        # Query for scoring: just the street address part (without postcode and city)
+        query_for_scoring = query.lower()
+        # Remove postcode pattern from query
+        if postcode:
+            query_for_scoring = (
+                query_for_scoring.replace(postcode.lower(), "").replace(",", " ").strip()
+            )
+        # Also try to remove city name if found
+        if city_from_query:
+            query_for_scoring = query_for_scoring.replace(city_from_query.lower(), "").strip()
+
+        if not query_for_scoring.strip():
             return []
 
-        results: list[AddressMatch] = []
+        # Adjust threshold for short queries (very lenient for short prefixes)
+        effective_min_score = min_score
+        if len(query_for_scoring.split()) == 1 and len(query_for_scoring) < 8:
+            effective_min_score = max(60, min_score - 10)
+
+        scored_results: list[tuple[float, AddressMatch]] = []
 
         if postcode:
-            # Fast path: use postcode to narrow search
-            for token in query_tokens:
-                rows = self.conn.execute(
-                    "SELECT street, housenumber, postcode, city, country "
-                    "FROM addresses "
-                    "WHERE postcode = ? AND street_lower LIKE ?",
-                    (postcode, f"%{token}%"),
-                ).fetchall()
+            # Fast path: use postcode to narrow search, then fuzzy match street/housenumber
+            rows = self.conn.execute(
+                "SELECT street, housenumber, postcode, city, country "
+                "FROM addresses "
+                "WHERE postcode = ?",
+                (postcode,),
+            ).fetchall()
 
-                for street, housenumber, pc, city, country in rows:
+            for street, housenumber, pc, city, country in rows:
+                # Score street + housenumber
+                street_addr = f"{street}"
+                if housenumber:
+                    street_addr += f" {housenumber}"
+
+                street_lower = street_addr.lower()
+                token_score = fuzz.token_set_ratio(query_for_scoring, street_lower)
+                partial_score = fuzz.partial_ratio(query_for_scoring, street_lower)
+                street_score = token_weight * token_score + partial_weight * partial_score
+
+                # Bonus: if city is in original query, boost score if it matches
+                city_bonus = 0
+                if city and city.lower() in query.lower():
+                    city_bonus = 25
+
+                total_score = street_score + city_bonus
+
+                # Only include matches above threshold
+                if total_score >= effective_min_score:
                     match = AddressMatch(
                         street=street,
                         housenumber=housenumber,
@@ -206,37 +265,44 @@ class AddressDB:
                         city=city,
                         country=country,
                     )
-                    results.append(match)
-                    if len(results) >= max_results:
-                        return results[:max_results]
+                    scored_results.append((total_score, match))
+
         else:
-            # Slow path: search by street tokens only
-            seen = set()
-            for token in query_tokens:
-                rows = self.conn.execute(
-                    "SELECT street, housenumber, postcode, city, country "
-                    "FROM addresses "
-                    "WHERE street_lower LIKE ? "
-                    "LIMIT ?",
-                    (f"%{token}%", max_results * 2),
-                ).fetchall()
+            # Slow path: search all addresses (limited to avoid memory issues)
+            rows = self.conn.execute(
+                "SELECT street, housenumber, postcode, city, country " "FROM addresses " "LIMIT ?",
+                (max_results * 20,),
+            ).fetchall()
 
-                for street, housenumber, pc, city, country in rows:
-                    key = (street, housenumber, pc, city, country)
-                    if key not in seen:
-                        seen.add(key)
-                        match = AddressMatch(
-                            street=street,
-                            housenumber=housenumber,
-                            postcode=pc,
-                            city=city,
-                            country=country,
-                        )
-                        results.append(match)
-                        if len(results) >= max_results:
-                            return results[:max_results]
+            for street, housenumber, pc, city, country in rows:
+                # Build address for fuzzy matching (street + housenumber only)
+                full_addr = f"{street}"
+                if housenumber:
+                    full_addr += f" {housenumber}"
+                if city:
+                    full_addr += f", {city}"
 
-        return results
+                # Calculate weighted fuzzy match score (0-100)
+                full_addr_lower = full_addr.lower()
+                token_score = fuzz.token_set_ratio(query_for_scoring, full_addr_lower)
+                partial_score = fuzz.partial_ratio(query_for_scoring, full_addr_lower)
+                score = token_weight * token_score + partial_weight * partial_score
+
+                # Only include matches above threshold
+                if score >= effective_min_score:
+                    match = AddressMatch(
+                        street=street,
+                        housenumber=housenumber,
+                        postcode=pc,
+                        city=city,
+                        country=country,
+                    )
+                    scored_results.append((score, match))
+
+        # Sort by score (descending), then by street name length (descending) as tiebreaker
+        # Longer street names are preferred when scores are equal
+        scored_results.sort(key=lambda x: (x[0], len(x[1].street or "")), reverse=True)
+        return scored_results[:max_results]
 
     def close(self) -> None:
         """Close the database connection."""

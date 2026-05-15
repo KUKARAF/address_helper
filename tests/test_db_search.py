@@ -5,15 +5,15 @@ def test_db_search_fast_path_with_postcode(address_db):
     """Test search when postcode is found (uses indexed fast path)."""
     results = address_db.search("Hauptstraße 10115")
     assert len(results) > 0
-    assert all(m.postcode == "10115" for m in results)
-    assert all("hauptstraße" in m.street.lower() for m in results if m.street)
+    assert all(m.postcode == "10115" for _, m in results)
+    assert all("hauptstraße" in m.street.lower() for _, m in results if m.street)
 
 
 def test_db_search_slow_path_no_postcode(address_db):
     """Test search without postcode (full street scan)."""
     results = address_db.search("Bahnhofstraße")
     assert len(results) > 0
-    assert all("bahnhofstraße" in m.street.lower() for m in results if m.street)
+    assert all("bahnhofstraße" in m.street.lower() for _, m in results if m.street)
 
 
 def test_db_search_no_results(address_db):
@@ -49,16 +49,17 @@ def test_db_search_max_results_custom(address_db):
 
 
 def test_db_search_returns_address_match(address_db):
-    """Test that results are AddressMatch objects."""
+    """Test that results are (score, AddressMatch) tuples."""
     results = address_db.search("Berlin")
-    for result in results:
-        assert isinstance(result, AddressMatch)
+    for score, match in results:
+        assert isinstance(score, (int, float))
+        assert isinstance(match, AddressMatch)
 
 
 def test_db_search_partial_token_match(address_db):
-    """Test LIKE matching finds partial tokens."""
+    """Test fuzzy matching finds partial tokens."""
     # Hauptstraße with housenumber 1
     results = address_db.search("Haupt")
-    # Should find rows where street_lower contains "haupt"
+    # Should find rows where street contains "Hauptstraße"
     assert len(results) > 0
-    assert any("Hauptstraße" in str(r) for r in results)
+    assert any("Hauptstraße" in str(m) for _, m in results)

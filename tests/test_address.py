@@ -22,7 +22,7 @@ def test_address_street_property(mock_db_class, mock_pbf_path, mock_db_url, clea
     """Test Address.street delegates to AddressMatch."""
     mock_match = AddressMatch(street="Hauptstraße")
     mock_db_instance = MagicMock()
-    mock_db_instance.search.return_value = [mock_match]
+    mock_db_instance.search.return_value = [(85.0, mock_match)]
     mock_db_class.return_value = mock_db_instance
     mock_pbf_path.return_value = "/fake/path.pbf"
     mock_db_url.side_effect = ValueError("No URL")
@@ -38,7 +38,7 @@ def test_address_housenumber_property(mock_db_class, mock_pbf_path, mock_db_url,
     """Test Address.housenumber delegates to AddressMatch."""
     mock_match = AddressMatch(housenumber="42")
     mock_db_instance = MagicMock()
-    mock_db_instance.search.return_value = [mock_match]
+    mock_db_instance.search.return_value = [(85.0, mock_match)]
     mock_db_class.return_value = mock_db_instance
     mock_pbf_path.return_value = "/fake/path.pbf"
     mock_db_url.side_effect = ValueError("No URL")
@@ -54,7 +54,7 @@ def test_address_postcode_property(mock_db_class, mock_pbf_path, mock_db_url, cl
     """Test Address.postcode delegates to AddressMatch."""
     mock_match = AddressMatch(postcode="10115")
     mock_db_instance = MagicMock()
-    mock_db_instance.search.return_value = [mock_match]
+    mock_db_instance.search.return_value = [(85.0, mock_match)]
     mock_db_class.return_value = mock_db_instance
     mock_pbf_path.return_value = "/fake/path.pbf"
     mock_db_url.side_effect = ValueError("No URL")
@@ -70,7 +70,7 @@ def test_address_city_property(mock_db_class, mock_pbf_path, mock_db_url, clear_
     """Test Address.city delegates to AddressMatch."""
     mock_match = AddressMatch(city="Berlin")
     mock_db_instance = MagicMock()
-    mock_db_instance.search.return_value = [mock_match]
+    mock_db_instance.search.return_value = [(85.0, mock_match)]
     mock_db_class.return_value = mock_db_instance
     mock_pbf_path.return_value = "/fake/path.pbf"
     mock_db_url.side_effect = ValueError("No URL")
@@ -86,7 +86,7 @@ def test_address_country_property(mock_db_class, mock_pbf_path, mock_db_url, cle
     """Test Address.country delegates to AddressMatch."""
     mock_match = AddressMatch(country="DE")
     mock_db_instance = MagicMock()
-    mock_db_instance.search.return_value = [mock_match]
+    mock_db_instance.search.return_value = [(85.0, mock_match)]
     mock_db_class.return_value = mock_db_instance
     mock_pbf_path.return_value = "/fake/path.pbf"
     mock_db_url.side_effect = ValueError("No URL")
@@ -102,7 +102,7 @@ def test_address_is_found_true(mock_db_class, mock_pbf_path, mock_db_url, clear_
     """Test is_found returns True when match is complete."""
     mock_match = AddressMatch(street="Hauptstraße", city="Berlin")
     mock_db_instance = MagicMock()
-    mock_db_instance.search.return_value = [mock_match]
+    mock_db_instance.search.return_value = [(85.0, mock_match)]
     mock_db_class.return_value = mock_db_instance
     mock_pbf_path.return_value = "/fake/path.pbf"
     mock_db_url.side_effect = ValueError("No URL")
@@ -120,7 +120,7 @@ def test_address_is_found_false_no_street(
     """Test is_found returns False when street is missing."""
     mock_match = AddressMatch(city="Berlin")
     mock_db_instance = MagicMock()
-    mock_db_instance.search.return_value = [mock_match]
+    mock_db_instance.search.return_value = [(85.0, mock_match)]
     mock_db_class.return_value = mock_db_instance
     mock_pbf_path.return_value = "/fake/path.pbf"
     mock_db_url.side_effect = ValueError("No URL")
@@ -142,6 +142,7 @@ def test_address_is_found_false_no_match(mock_db_class, mock_pbf_path, mock_db_u
 
     address = Address("Nonexistent Street, Nowhere")
     assert address.is_found is False
+    assert address.candidates == []
 
 
 @patch("address_standardizer.address.get_db_url")
@@ -151,7 +152,7 @@ def test_address_str(mock_db_class, mock_pbf_path, mock_db_url, clear_db_cache):
     """Test Address.__str__ delegates to AddressMatch."""
     mock_match = AddressMatch(street="Hauptstraße", housenumber="1", city="Berlin")
     mock_db_instance = MagicMock()
-    mock_db_instance.search.return_value = [mock_match]
+    mock_db_instance.search.return_value = [(85.0, mock_match)]
     mock_db_class.return_value = mock_db_instance
     mock_pbf_path.return_value = "/fake/path.pbf"
     mock_db_url.side_effect = ValueError("No URL")
@@ -169,7 +170,7 @@ def test_address_repr(mock_db_class, mock_pbf_path, mock_db_url, clear_db_cache)
     """Test Address.__repr__ shows key fields."""
     mock_match = AddressMatch(street="Hauptstraße", city="Berlin", postcode="10115", country="DE")
     mock_db_instance = MagicMock()
-    mock_db_instance.search.return_value = [mock_match]
+    mock_db_instance.search.return_value = [(85.0, mock_match)]
     mock_db_class.return_value = mock_db_instance
     mock_pbf_path.return_value = "/fake/path.pbf"
     mock_db_url.side_effect = ValueError("No URL")
@@ -187,7 +188,7 @@ def test_address_cache_reuse(mock_db_class, mock_pbf_path, mock_db_url, clear_db
     """Test _DB_CACHE reuses same DB for same iso_code."""
     mock_match = AddressMatch(street="Hauptstraße", city="Berlin")
     mock_db_instance = MagicMock()
-    mock_db_instance.search.return_value = [mock_match]
+    mock_db_instance.search.return_value = [(85.0, mock_match)]
     mock_db_class.return_value = mock_db_instance
     mock_pbf_path.return_value = "/fake/path.pbf"
     mock_db_url.side_effect = ValueError("No URL")
@@ -206,7 +207,7 @@ def test_address_cache_separate_country(mock_db_class, mock_pbf_path, mock_db_ur
     """Test _DB_CACHE creates separate DBs for different iso_codes."""
     mock_match = AddressMatch(street="Some Street", city="Some City")
     mock_db_instance = MagicMock()
-    mock_db_instance.search.return_value = [mock_match]
+    mock_db_instance.search.return_value = [(85.0, mock_match)]
     mock_db_class.return_value = mock_db_instance
     mock_pbf_path.return_value = "/fake/path.pbf"
     mock_db_url.side_effect = ValueError("No URL")

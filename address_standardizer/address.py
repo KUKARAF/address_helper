@@ -58,10 +58,13 @@ class Address:
             _DB_CACHE[iso_upper] = AddressDB(pbf_path, db_url=resolved_db_url)
 
         db = _DB_CACHE[iso_upper]
-        matches = db.search(raw_string)
+        candidates = db.search(raw_string)
+
+        # Store all candidates (score, match tuples)
+        self._candidates: list[tuple[float, AddressMatch]] = candidates
 
         # Use the first match (best match)
-        self._match: Optional[AddressMatch] = matches[0] if matches else None
+        self._match: Optional[AddressMatch] = candidates[0][1] if candidates else None
 
         if not self._match:
             # Create empty match if no results found
@@ -96,6 +99,11 @@ class Address:
     def is_found(self) -> bool:
         """Whether a matching address was found."""
         return bool(self._match and self._match.is_complete())
+
+    @property
+    def candidates(self) -> list[tuple[float, AddressMatch]]:
+        """All matching candidates with scores, sorted by score descending."""
+        return self._candidates
 
     def __str__(self) -> str:
         """Format as standardized address string."""

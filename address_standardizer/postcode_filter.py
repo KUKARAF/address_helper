@@ -62,9 +62,18 @@ class PostcodeExtractor:
 
 
 def extract_postcode_from_address(address_string: str) -> Optional[str]:
-    """Try to extract a postcode from the address string."""
-    # German postcodes are 5 digits
-    match = re.search(r'\b\d{5}\b', address_string)
+    """Try to extract a postcode from the address string.
+
+    Matches: German (5 digits), Dutch (4 digits + 2 letters), and other formats.
+    """
+    # Try German format first (5 digits)
+    match = re.search(r"\b\d{5}\b", address_string)
     if match:
         return match.group()
+
+    # Try Dutch format (4 digits + 2 letters, e.g. 7534XJ)
+    match = re.search(r"\b\d{4}[A-Z]{2}\b", address_string, re.IGNORECASE)
+    if match:
+        return match.group()
+
     return None
