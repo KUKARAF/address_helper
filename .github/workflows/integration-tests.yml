@@ -26,10 +26,10 @@ jobs:
         uses: astral-sh/setup-uv@v2
 
       - name: Install dependencies
-        run: uv pip install --system -e ".[dev]"
+        run: uv pip install -e ".[dev]" --python $(which python)
 
       - name: Run integration tests (100 real addresses)
-        run: uv run pytest tests/test_integration_addresses.py -v
+        run: pytest tests/test_integration_addresses.py -v
 
       - name: Run all unit tests
-        run: uv run pytest tests/ -v --cov=address_standardizer
+        run: pytest tests/ -v --cov=address_standardizer
