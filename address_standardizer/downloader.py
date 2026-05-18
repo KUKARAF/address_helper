@@ -9,8 +9,6 @@ import requests
 
 from .models.region import get_country_region
 
-GITHUB_REPO = "KUKARAF/address_helper"
-
 
 def get_cache_dir() -> Path:
     """Get the cache directory for PBF files, creating it if needed."""
@@ -92,7 +90,7 @@ def get_db_url(iso_code: str, override_url: Optional[str] = None) -> str:
     Precedence (highest to lowest):
     1. override_url parameter (if provided)
     2. DB_URL environment variable
-    3. GitHub release URL constructed from the installed package version
+    3. db_url from links.toml for the country
 
     Args:
         iso_code: ISO 3166-1 alpha-2 country code
@@ -108,15 +106,10 @@ def get_db_url(iso_code: str, override_url: Optional[str] = None) -> str:
     if env_url:
         return env_url
 
-    from . import __version__
-
-    iso_upper = iso_code.upper()
-    # Validate the country code is supported
-    get_country_region(iso_code)
-    return (
-        f"https://github.com/{GITHUB_REPO}/releases/download/"
-        f"v{__version__}/{iso_upper}-addresses.osm.db"
-    )
+    region = get_country_region(iso_code)
+    if not region.db_url:
+        raise ValueError(f"No db_url configured for country '{iso_code}' in links.toml")
+    return region.db_url
 
 
 def get_db_cache_path(iso_code: str) -> Path:
@@ -169,8 +162,8 @@ def download_db(iso_code: str, force: bool = False) -> Path:
         print(f"Using cached DB at {cache_path}", flush=True)
         return cache_path
 
+    region = get_country_region(iso_code)
     url = get_db_url(iso_code)
-    md5_url = url + ".md5"
     tmp_path = cache_path.with_suffix(".tmp")
 
     print(f"Downloading DB from {url}...", flush=True)
@@ -189,13 +182,13 @@ def download_db(iso_code: str, force: bool = False) -> Path:
                     if total_size:
                         print(f"  {downloaded / total_size * 100:.1f}%", end="\r", flush=True)
 
-        expected_md5 = _fetch_expected_md5(md5_url)
+        # Use checksum from links.toml if available, otherwise try .md5 sidecar URL
+        expected_md5 = region.db_checksum or _fetch_expected_md5(url + ".md5")
         if expected_md5:
             actual_md5 = _compute_md5(tmp_path)
             if actual_md5 != expected_md5:
                 raise ValueError(
-                    f"MD5 mismatch for {cache_path.name}: "
-                    f"expected {expected_md5}, got {actual_md5}"
+                    f"MD5 mismatch for {cache_path.name}: expected {expected_md5}, got {actual_md5}"
                 )
 
         tmp_path.rename(cache_path)

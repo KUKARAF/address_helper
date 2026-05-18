@@ -3,12 +3,12 @@ import pytest
 from address_standardizer.downloader import get_db_url
 
 
-def test_get_db_url_from_package_version(monkeypatch):
-    """Test get_db_url constructs a GitHub release URL from the package version."""
+def test_get_db_url_from_toml(monkeypatch):
+    """Test get_db_url reads the URL from links.toml."""
     monkeypatch.delenv("DB_URL", raising=False)
 
     url = get_db_url("DE")
-    assert "github.com/KUKARAF/address_helper/releases/download" in url
+    assert "static.osmosis.page" in url
     assert "DE-addresses.osm.db" in url
 
 

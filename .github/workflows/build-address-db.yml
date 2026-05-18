@@ -80,12 +80,21 @@ jobs:
           ADDRESS_STANDARDIZER_DB_PATH: ${{ github.workspace }}/DE-addresses.osm.db
         run: python -m pytest tests/test_integration_addresses.py -v
 
-      - name: Create Release
+      - name: Upload DB to static.osmosis.page
+        run: |
+          echo "${{ secrets.BIGBOY_SSH_KEY }}" > /tmp/bigboy_key
+          chmod 600 /tmp/bigboy_key
+          scp -i /tmp/bigboy_key -o StrictHostKeyChecking=no \
+            DE-addresses.osm.db DE-addresses.osm.db.md5 \
+            rafa@bigboy:/home/rafa/env/static/public/osm/
+          rm /tmp/bigboy_key
+        env:
+          BIGBOY_SSH_KEY: ${{ secrets.BIGBOY_SSH_KEY }}
+
+      - name: Create Release (tag + MD5 only)
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            DE-addresses.osm.db
-            DE-addresses.osm.db.md5
+          files: DE-addresses.osm.db.md5
           tag_name: ${{ steps.pkg-version.outputs.version }}
           name: Address DB ${{ steps.pkg-version.outputs.version }}
           make_latest: true
@@ -93,6 +102,8 @@ jobs:
             Address database for address-standardizer ${{ steps.pkg-version.outputs.version }}
 
             Built from commit: ${{ github.sha }}
+
+            **Download:** https://static.osmosis.page/osm/DE-addresses.osm.db
 
             **Database Info:**
             - Size: ${{ steps.db-info.outputs.size }}
