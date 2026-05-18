@@ -38,12 +38,12 @@ jobs:
       - name: Extract package version
         id: pkg-version
         run: |
-          VERSION=$(python -c "import tomllib; data=tomllib.load(open('pyproject.toml','rb')); print(data['project']['version'])")
+          VERSION=$(grep '^version' pyproject.toml | head -1 | sed 's/.*= *"\(.*\)"/\1/')
           echo "version=v${VERSION}" >> $GITHUB_OUTPUT
           echo "Package version: v${VERSION}"
 
       - name: Install dependencies
-        run: uv pip install -e ".[dev]"
+        run: uv pip install --system -e ".[dev]"
 
       - name: Download OSM PBF and build DB
         run: |
