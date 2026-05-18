@@ -26,7 +26,7 @@ jobs:
         uses: astral-sh/setup-uv@v2
 
       - name: Install dependencies
-        run: uv sync --all-extras
+        run: uv pip install --system -e ".[dev]"
 
       - name: Get package version
         id: pkg-version
@@ -45,7 +45,7 @@ jobs:
 
       - name: Run integration tests (100 real addresses)
         if: steps.download-db.outcome == 'success'
-        run: .venv/bin/python -m pytest tests/test_integration_addresses.py -v
+        run: python -m pytest tests/test_integration_addresses.py -v
 
       - name: Run all unit tests
-        run: .venv/bin/python -m pytest tests/ -v --cov=address_standardizer
+        run: python -m pytest tests/ -v --cov=address_standardizer

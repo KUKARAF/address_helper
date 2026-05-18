@@ -83,7 +83,7 @@ jobs:
       - name: Run integration tests against built DB
         env:
           ADDRESS_STANDARDIZER_DB_PATH: ${{ github.workspace }}/DE-addresses.osm.db
-        run: .venv/bin/python -m pytest tests/test_integration_addresses.py -v
+        run: python -m pytest tests/test_integration_addresses.py -v
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
