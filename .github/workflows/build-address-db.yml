@@ -45,11 +45,29 @@ jobs:
         run: |
           python -c "
           from address_standardizer.db import AddressDB
-          from address_standardizer.downloader import get_pbf_path
+          from address_standardizer.downloader import download_pbf
+          from address_standardizer.models.region import get_country_region
           from pathlib import Path
+          import requests
 
-          print('Downloading PBF file...')
-          pbf_path = get_pbf_path('DE', force=True)
+          # Always download from Geofabrik source (full PBF) — not the minified version
+          region = get_country_region('DE')
+          url = region.full_file.url
+          pbf_path = Path('DE-addresses.osm.pbf')
+
+          print(f'Downloading full PBF from {url}...')
+          response = requests.get(url, stream=True)
+          response.raise_for_status()
+          total = int(response.headers.get('content-length', 0))
+          done = 0
+          with open(pbf_path, 'wb') as f:
+              for chunk in response.iter_content(chunk_size=65536):
+                  if chunk:
+                      f.write(chunk)
+                      done += len(chunk)
+                      if total:
+                          print(f'  {done/total*100:.1f}%', end='\r', flush=True)
+          print(f'\nDownloaded {pbf_path.stat().st_size / (1024**3):.1f}GB')
 
           print(f'Building DB from {pbf_path}...')
           db = AddressDB(pbf_path)
