@@ -1,6 +1,7 @@
 name: Build Address DB
 
 on:
+  workflow_dispatch:
   push:
     paths:
       - 'address_standardizer/db.py'
