@@ -28,7 +28,23 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-extras
 
+      - name: Get package version
+        id: pkg-version
+        run: |
+          VERSION=$(python -c "import tomllib; data=tomllib.load(open('pyproject.toml','rb')); print(data['project']['version'])")
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Download released address DB
+        id: download-db
+        continue-on-error: true
+        run: |
+          mkdir -p ~/.address-standardizer
+          curl -fL \
+            "https://github.com/KUKARAF/address_helper/releases/download/v${{ steps.pkg-version.outputs.version }}/DE-addresses.osm.db" \
+            -o ~/.address-standardizer/DE-addresses.osm.db.v${{ steps.pkg-version.outputs.version }}
+
       - name: Run integration tests (100 real addresses)
+        if: steps.download-db.outcome == 'success'
         run: .venv/bin/python -m pytest tests/test_integration_addresses.py -v
 
       - name: Run all unit tests

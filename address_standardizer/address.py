@@ -3,7 +3,7 @@
 from typing import Optional
 
 from .db import AddressDB
-from .downloader import get_pbf_path, get_db_url
+from .downloader import download_db, get_pbf_path
 from .query import AddressMatch
 
 # One AddressDB per iso_code, shared across all Address instances in a process
@@ -40,22 +40,16 @@ class Address:
         self.raw_string = raw_string
         self.iso_code = iso_code
 
-        # Get PBF file, downloading if necessary
-        pbf_path = get_pbf_path(iso_code, force=force_download)
-
-        # Get or create DB index (one per iso_code)
         iso_upper = iso_code.upper()
         if iso_upper not in _DB_CACHE:
-            # Try to use remote DB URL, falling back to local build
-            resolved_db_url = db_url
-            if not resolved_db_url:
-                try:
-                    resolved_db_url = get_db_url(iso_code)
-                except ValueError:
-                    # No remote DB available, will build from PBF
-                    resolved_db_url = None
-
-            _DB_CACHE[iso_upper] = AddressDB(pbf_path, db_url=resolved_db_url)
+            if db_url:
+                # Explicit URL override — download via legacy AddressDB path
+                pbf_path = get_pbf_path(iso_code, force=force_download)
+                _DB_CACHE[iso_upper] = AddressDB(pbf_path, db_url=db_url)
+            else:
+                # Normal path: version-keyed cache, falls back to GitHub release download
+                db_path = download_db(iso_code, force=force_download)
+                _DB_CACHE[iso_upper] = AddressDB.from_path(db_path)
 
         db = _DB_CACHE[iso_upper]
         candidates = db.search(raw_string)

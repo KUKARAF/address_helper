@@ -3,14 +3,13 @@ import pytest
 from address_standardizer.downloader import get_db_url
 
 
-def test_get_db_url_from_toml(monkeypatch):
-    """Test get_db_url returns URL from links.toml when no override."""
-    # Ensure env var is not set
+def test_get_db_url_from_package_version(monkeypatch):
+    """Test get_db_url constructs a GitHub release URL from the package version."""
     monkeypatch.delenv("DB_URL", raising=False)
 
     url = get_db_url("DE")
-    assert url is not None
-    assert "addresses.osm.db" in url or ".db" in url
+    assert "github.com/KUKARAF/address_helper/releases/download" in url
+    assert "DE-addresses.osm.db" in url
 
 
 def test_get_db_url_env_var_override(monkeypatch):
@@ -41,7 +40,8 @@ def test_get_db_url_precedence_all_three(monkeypatch):
     assert url == param_url
 
 
-def test_get_db_url_invalid_country():
+def test_get_db_url_invalid_country(monkeypatch):
     """Test get_db_url raises for unsupported country."""
+    monkeypatch.delenv("DB_URL", raising=False)
     with pytest.raises(ValueError):
         get_db_url("XX")

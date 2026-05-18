@@ -24,9 +24,6 @@ source_checksum = "https://download.geofabrik.de/europe/germany-latest.osm.pbf.m
 # Minified: Address-only PBF (used by Library Flow 2, updated by CI/CD)
 pbf_url = "https://static.osmosis.page/osm/DE-addresses.osm.pbf"
 checksum_url = "https://static.osmosis.page/osm/DE-addresses.osm.pbf.md5"
-# Pre-built SQLite index (faster alternative to building from PBF)
-db_url = "https://static.osmosis.page/osm/DE-addresses.osm.db"
-db_checksum = "db72ef2b3322a47c4bac40c2010b4464"
 
 # Countries below will be added as minified PBF files are generated:
 # [countries.AT]

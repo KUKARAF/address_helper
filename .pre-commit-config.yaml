@@ -3,14 +3,16 @@ repos:
     rev: v0.3.0
     hooks:
       - id: ruff
-        args: [--fix]
+        args: [--no-fix]
       - id: ruff-format
+        args: [--check]
 
   - repo: local
     hooks:
       - id: pytest
         name: pytest
-        entry: pytest
+        entry: .venv/bin/pytest
+        args: [--ignore=tests/test_integration_addresses.py, --no-cov]
         language: system
         types: [python]
         pass_filenames: false

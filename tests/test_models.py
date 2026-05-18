@@ -55,8 +55,6 @@ def test_country_region_preferred_file_fallback():
             is_minified=False,
         ),
         minified_file=None,
-        db_url=None,
-        db_checksum=None,
     )
     assert region.preferred_file == region.full_file
 

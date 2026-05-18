@@ -96,6 +96,18 @@ class AddressDB:
 
         self.conn = sqlite3.connect(str(self.db_path))
 
+    @classmethod
+    def from_path(cls, db_path: Path) -> "AddressDB":
+        """Open a pre-existing DB file without any build or download logic."""
+        db_path = Path(db_path)
+        if not db_path.exists():
+            raise FileNotFoundError(f"Database not found: {db_path}")
+        instance = object.__new__(cls)
+        instance.pbf_path = db_path.with_suffix(".pbf")  # placeholder, not used
+        instance.db_path = db_path
+        instance.conn = sqlite3.connect(str(db_path))
+        return instance
+
     def _db_is_fresh(self) -> bool:
         """Return True if DB exists and is newer than (or equal to) PBF."""
         if not self.db_path.exists():

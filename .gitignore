@@ -3,3 +3,10 @@ resources.md
 
 # OSM PBF cache - large downloaded files should not be committed
 .osm-cache/
+
+__pycache__/
+*.pyc
+*.pyo
+.coverage
+*.db
+*.pbf
