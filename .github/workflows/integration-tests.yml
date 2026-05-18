@@ -45,4 +45,4 @@ jobs:
         run: python -m pytest tests/test_integration_addresses.py -v
 
       - name: Run all unit tests
-        run: python -m pytest tests/ -v --cov=address_standardizer
+        run: python -m pytest tests/ -v --cov=address_standardizer --ignore=tests/test_integration_addresses.py
