@@ -82,14 +82,9 @@ jobs:
 
       - name: Upload DB to static.osmosis.page
         run: |
-          echo "${{ secrets.BIGBOY_SSH_KEY }}" > /tmp/bigboy_key
-          chmod 600 /tmp/bigboy_key
-          scp -i /tmp/bigboy_key -o StrictHostKeyChecking=no \
+          rsync -avz --progress \
             DE-addresses.osm.db DE-addresses.osm.db.md5 \
             rafa@bigboy:/home/rafa/env/static/public/osm/
-          rm /tmp/bigboy_key
-        env:
-          BIGBOY_SSH_KEY: ${{ secrets.BIGBOY_SSH_KEY }}
 
       - name: Create Release (tag + MD5 only)
         uses: softprops/action-gh-release@v2
