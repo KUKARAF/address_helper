@@ -45,7 +45,6 @@ jobs:
         run: |
           python -c "
           from address_standardizer.db import AddressDB
-          from address_standardizer.downloader import download_pbf
           from address_standardizer.models.region import get_country_region
           from pathlib import Path
           import requests
