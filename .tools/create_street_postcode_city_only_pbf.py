@@ -66,15 +66,17 @@ def dump_toml(data: dict, path: Path) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Update links.toml after a minified PBF upload."
+    parser = argparse.ArgumentParser(description="Update links.toml after a minified PBF upload.")
+    parser.add_argument("--toml", required=True, help="Path to links.toml")
+    parser.add_argument("--country", required=True, help="ISO 3166-1 alpha-2 code, e.g. DE")
+    parser.add_argument(
+        "--minified-url", required=True, help="Public URL of the uploaded minified PBF"
     )
-    parser.add_argument("--toml",               required=True,  help="Path to links.toml")
-    parser.add_argument("--country",            required=True,  help="ISO 3166-1 alpha-2 code, e.g. DE")
-    parser.add_argument("--minified-url",       required=True,  help="Public URL of the uploaded minified PBF")
-    parser.add_argument("--minified-checksum",  required=True,  help="Public URL of the MD5 checksum file")
-    parser.add_argument("--minified-size-mb",   required=True,  type=float, help="File size in MB")
-    parser.add_argument("--timestamp",          required=False, help="ISO 8601 timestamp (default: now UTC)")
+    parser.add_argument(
+        "--minified-checksum", required=True, help="Public URL of the MD5 checksum file"
+    )
+    parser.add_argument("--minified-size-mb", required=True, type=float, help="File size in MB")
+    parser.add_argument("--timestamp", required=False, help="ISO 8601 timestamp (default: now UTC)")
     args = parser.parse_args()
 
     toml_path = Path(args.toml)
@@ -92,10 +94,10 @@ def main() -> None:
         sys.exit(1)
 
     # Update the country entry
-    data["countries"][iso_code]["minified"]          = args.minified_url
+    data["countries"][iso_code]["minified"] = args.minified_url
     data["countries"][iso_code]["minified_checksum"] = args.minified_checksum
-    data["countries"][iso_code]["minified_size_mb"]  = args.minified_size_mb
-    data["countries"][iso_code]["last_minified"]     = timestamp
+    data["countries"][iso_code]["minified_size_mb"] = args.minified_size_mb
+    data["countries"][iso_code]["last_minified"] = timestamp
 
     # Update meta timestamp
     data["meta"]["last_updated"] = timestamp

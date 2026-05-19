@@ -3,7 +3,7 @@
 from typing import Optional
 
 from .db import AddressDB
-from .downloader import download_db, get_pbf_path
+from .downloader import download_db
 from .query import AddressMatch
 
 # One AddressDB per iso_code, shared across all Address instances in a process
@@ -25,7 +25,6 @@ class Address:
         raw_string: str,
         iso_code: str = "DE",
         force_download: bool = False,
-        db_url: Optional[str] = None,
     ):
         """
         Initialize and standardize an address.
@@ -33,23 +32,15 @@ class Address:
         Args:
             raw_string: Raw address string to standardize
             iso_code: ISO 3166-1 alpha-2 country code (default: "DE")
-            force_download: Force re-download of PBF file
-            db_url: Optional explicit database URL (overrides default from links.toml)
-                    Can also be set via DB_URL environment variable
+            force_download: Force re-download of the address database
         """
         self.raw_string = raw_string
         self.iso_code = iso_code
 
         iso_upper = iso_code.upper()
         if iso_upper not in _DB_CACHE:
-            if db_url:
-                # Explicit URL override — download via legacy AddressDB path
-                pbf_path = get_pbf_path(iso_code, force=force_download)
-                _DB_CACHE[iso_upper] = AddressDB(pbf_path, db_url=db_url)
-            else:
-                # Normal path: version-keyed cache, falls back to GitHub release download
-                db_path = download_db(iso_code, force=force_download)
-                _DB_CACHE[iso_upper] = AddressDB.from_path(db_path)
+            db_path = download_db(iso_code, force=force_download)
+            _DB_CACHE[iso_upper] = AddressDB.from_path(db_path)
 
         db = _DB_CACHE[iso_upper]
         candidates = db.search(raw_string)

@@ -9,7 +9,7 @@ comprehensive coverage.
 
 from address_standardizer import Address
 from address_standardizer.db import AddressDB
-from address_standardizer.downloader import get_pbf_path
+from address_standardizer.downloader import download_db
 
 
 def test_integration_100_random_addresses():
@@ -21,8 +21,8 @@ def test_integration_100_random_addresses():
     - All have complete verified data (street, housenumber, postcode, city)
     - Addresses are random each test run for comprehensive coverage
     """
-    pbf_path = get_pbf_path("DE")
-    db = AddressDB(pbf_path)
+    db_path = download_db("DE")
+    db = AddressDB.from_path(db_path)
 
     cursor = db.conn.execute("""
         SELECT street, housenumber, postcode, city

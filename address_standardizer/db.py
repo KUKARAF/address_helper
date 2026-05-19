@@ -1,11 +1,10 @@
-"""SQLite-backed address index built from an OSM PBF file or downloaded from a remote URL."""
+"""SQLite-backed address index built from an OSM PBF file."""
 
 import sqlite3
 from pathlib import Path
 from typing import Any, Optional
 
 import osmium
-import requests
 from rapidfuzz import fuzz
 
 from .postcode_filter import extract_postcode_from_address
@@ -73,25 +72,21 @@ class _DBBuilder(osmium.SimpleHandler):
 class AddressDB:
     """SQLite index for addresses from a PBF file or remote database."""
 
-    def __init__(self, pbf_path: Path, db_url: Optional[str] = None) -> None:
+    def __init__(self, pbf_path: Path) -> None:
         """
-        Open or build the address index.
+        Open or build the address index from a PBF file.
 
-        If db_url is provided, download the pre-built database instead of building from PBF.
-        Otherwise, DB is stored next to the PBF as pbf_path.with_suffix('.db').
+        DB is stored next to the PBF as pbf_path.with_suffix('.db').
         Builds if: DB does not exist, or PBF is newer than DB.
 
         Args:
-            pbf_path: Path to the PBF file (used for local DB path)
-            db_url: Optional URL to download pre-built database from
+            pbf_path: Path to the PBF file (used for local DB path and output)
         """
         self.pbf_path = Path(pbf_path)
         self.db_path = self.pbf_path.with_suffix(".db")
         self.conn: Optional[sqlite3.Connection] = None
 
-        if db_url:
-            self._download_db(db_url)
-        elif not self._db_is_fresh():
+        if not self._db_is_fresh():
             self._build()
 
         self.conn = sqlite3.connect(str(self.db_path))
@@ -115,30 +110,6 @@ class AddressDB:
         pbf_mtime = self.pbf_path.stat().st_mtime
         db_mtime = self.db_path.stat().st_mtime
         return db_mtime >= pbf_mtime
-
-    def _download_db(self, url: str) -> None:
-        """Download pre-built database from a remote URL."""
-        if self.db_path.exists():
-            print(f"Using cached database at {self.db_path}", flush=True)
-            return
-
-        print(f"Downloading database from {url}...", flush=True)
-        response = requests.get(url, stream=True)
-        response.raise_for_status()
-
-        total_size = int(response.headers.get("content-length", 0))
-        downloaded = 0
-
-        with open(self.db_path, "wb") as f:
-            for chunk in response.iter_content(chunk_size=8192):
-                if chunk:
-                    f.write(chunk)
-                    downloaded += len(chunk)
-                    if total_size:
-                        percent = (downloaded / total_size) * 100
-                        print(f"  {percent:.1f}%", end="\r", flush=True)
-
-        print(f"\n✓ Database downloaded to {self.db_path}", flush=True)
 
     def _build(self) -> None:
         """Build the SQLite index from the PBF file."""
