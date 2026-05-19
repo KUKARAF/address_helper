@@ -1,12 +1,19 @@
 #!/usr/bin/env bash
-# Upload address DB and PBF artifacts to static.osmosis.page (rafa@bigboy).
+# Upload address DB and optional PBF artifacts to static.osmosis.page (rafa@bigboy).
+# Also uploads .md5 sidecar files for checksum verification.
 #
 # Usage:
 #   ./upload_static_osmosis_page.sh [DB_FILE] [PBF_FILE]
 #
 # Defaults:
 #   DB_FILE  = DE-addresses.osm.db   (in current directory)
-#   PBF_FILE = DE-addresses.osm.pbf  (in current directory)
+#   PBF_FILE = DE-addresses.osm.pbf  (in current directory, optional)
+#
+# This script:
+#   1. Generates MD5 checksums for both DB and PBF
+#   2. Uploads DB + DB.md5 to https://static.osmosis.page/osm/
+#   3. Uploads PBF + PBF.md5 to same location (if PBF file exists)
+#   4. Outputs the DB checksum for updating links.toml
 #
 # After upload, update db_checksum in address_standardizer/data/links.toml.
 
