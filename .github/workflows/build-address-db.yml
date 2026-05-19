@@ -98,12 +98,11 @@ jobs:
           ADDRESS_STANDARDIZER_DB_PATH: ${{ github.workspace }}/DE-addresses.osm.db
         run: python -m pytest tests/test_integration_addresses.py -v
 
-      # Uncomment when SSH access to bigboy is configured on the runner:
-      # - name: Upload DB to static.osmosis.page
-      #   run: |
-      #     rsync -avz --progress \
-      #       DE-addresses.osm.db DE-addresses.osm.db.md5 \
-      #       rafa@bigboy:/home/rafa/env/static/public/osm/
+      # Manual upload step (requires SSH key on runner):
+      # After build completes, download artifacts and run:
+      #   ./.tools/upload_static_osmosis_page.sh DE-addresses.osm.db
+      # This will upload both DB and .md5 sidecar to static.osmosis.page
+      # and output the checksum for links.toml
 
       - name: Create Release (tag + MD5 only)
         uses: softprops/action-gh-release@v2

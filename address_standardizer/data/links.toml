@@ -1,37 +1,12 @@
 # links.toml
-# Maps ISO 3166-1 alpha-2 country codes to OSM PBF URLs.
-#
-# Each entry has:
-#   source_url      = Full Geofabrik PBF (used by CI/CD to download and minify)
-#   source_checksum = Geofabrik MD5 checksum URL
-#   pbf_url         = Minified PBF on static.osmosis.page (used by library)
-#   checksum_url    = Minified PBF MD5 checksum URL
-#
-# Flow 1 (CI/CD): Downloads source_url → minifies → uploads → updates pbf_url
-# Flow 2 (Library): Only uses pbf_url to download minified file
-#
-# Minified files contain only address-relevant OSM tags (see osm-filter-spec.md).
+# Pre-built SQLite database URLs and checksums.
+# Downloaded and cached by the library at ~/.address-standardizer/
 
 [meta]
 schema_version = "1"
-last_updated = "2024-01-15T12:00:00Z"
+last_updated = "2026-05-19T15:47:00Z"
 
 [countries.DE]
 name = "Germany"
-# Source: Full Geofabrik PBF (used by CI/CD Flow 1)
-source_url = "https://download.geofabrik.de/europe/germany-latest.osm.pbf"
-source_checksum = "https://download.geofabrik.de/europe/germany-latest.osm.pbf.md5"
-# Minified: Address-only PBF (used by Library Flow 2, updated by CI/CD)
-pbf_url = "https://static.osmosis.page/osm/DE-addresses.osm.pbf"
-checksum_url = "https://static.osmosis.page/osm/DE-addresses.osm.pbf.md5"
-# Pre-built SQLite DB — uploaded manually via .tools/upload_static_osmosis_page.sh
 db_url = "https://static.osmosis.page/osm/DE-addresses.osm.db"
-db_checksum = "db72ef2b3322a47c4bac40c2010b4464"
-
-# Countries below will be added as minified PBF files are generated:
-# [countries.AT]
-# name = "Austria"
-# source_url = "https://download.geofabrik.de/europe/austria-latest.osm.pbf"
-# source_checksum = "https://download.geofabrik.de/europe/austria-latest.osm.pbf.md5"
-# pbf_url = ""
-# checksum_url = ""
+db_checksum = "32f3600e907ad224320fab9dcff52ca8"
